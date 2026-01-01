@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personel Envanter & İzin Süreci Portalı</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="styles.css">
+
+    <!-- CDNs -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="main-header">
+            <div class="logo-area">
+                <div class="logo-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h1>Personel Portalı</h1>
+                    <span class="header-subtitle">Yönetim & Süreç Takibi</span>
+                </div>
+            </div>
+
+            <div class="data-source-strip">
+                <div class="info">
+                    <span class="icon">📊</span>
+                    <span id="data-source-info">Yükleniyor...</span>
+                </div>
+                <div class="actions">
+                    <button class="btn btn-sm btn-outline" id="btn-refresh-data" title="Verileri Excel'den Yeniden Oku">
+                        🔄 Yenile
+                    </button>
+                    <button class="btn btn-sm btn-outline text-danger" id="btn-reset-changes"
+                        title="Manuel Düzenlemeleri Sil">
+                        🗑️ Sıfırla
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content hidden" id="main-interface">
+            <!-- Navigation -->
+            <nav class="sub-nav">
+                <ul>
+                    <li class="active" data-tab="dashboard">Dashboard</li>
+                    <li data-tab="inventory">Personel Envanteri <span class="badge" id="count-inventory">0</span></li>
+                    <li data-tab="process">İzin Süreci <span class="badge" id="count-process">0</span></li>
+                    <li data-tab="reports">Raporlar</li>
+                    <li data-tab="quality">Veri Kalitesi</li>
+                </ul>
+            </nav>
+
+            <!-- Tab: Dashboard -->
+            <div id="tab-dashboard" class="tab-content active">
+                <div class="kpi-grid" id="dashboard-kpis">
+                    <!-- KPIs injected here -->
+                </div>
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <h3>Kategori Dağılımı</h3>
+                        <canvas id="chart-categories"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <h3>REPSAM Rol Dağılımı</h3>
+                        <canvas id="chart-repsam"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Süreç Durumu</h3>
+                        <canvas id="chart-status"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab: Inventory -->
+            <div id="tab-inventory" class="tab-content">
+                <div class="toolbar">
+                    <div class="filters">
+                        <input type="text" id="inv-search" placeholder="Ad Soyad Ara..." class="search-input">
+                        <select id="inv-filter-category" class="filter-select">
+                            <option value="">Tüm Kategoriler</option>
+                        </select>
+                        <select id="inv-filter-tag" class="filter-select">
+                            <option value="">Tüm Roller</option>
+                        </select>
+                    </div>
+                    <div class="actions">
+                        <button class="btn btn-primary" id="btn-export-inventory">CSV İndir</button>
+                    </div>
+                </div>
+                <p class="section-hint">ℹ️ Satır detayını görmek ve düzenlemek için üzerine tıklayın.</p>
+                <div class="table-container">
+                    <table id="table-inventory" class="data-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Ad Soyad</th>
+                                <th>Kategori</th>
+                                <th>Etiket / Rol</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <div class="pagination" id="pagination-inventory"></div>
+            </div>
+
+            <!-- Tab: Process -->
+            <div id="tab-process" class="tab-content">
+                <div class="toolbar">
+                    <div class="filters">
+                        <input type="text" id="proc-search" placeholder="Arama..." class="search-input">
+                        <select id="proc-filter-status" class="filter-select">
+                            <option value="">Tüm Durumlar</option>
+                        </select>
+                        <select id="proc-filter-ref" class="filter-select">
+                            <option value="">Tüm Sorumlular</option>
+                        </select>
+                        <label class="checkbox-filter">
+                            <input type="checkbox" id="proc-filter-late"> Gecikmiş İşler
+                        </label>
+                    </div>
+                    <div class="actions">
+                        <button class="btn btn-primary" id="btn-export-process">CSV İndir</button>
+                    </div>
+                </div>
+                <p class="section-hint">ℹ️ Durum güncellemek veya not eklemek için satıra tıklayın.</p>
+                <div class="table-container">
+                    <table id="table-process" class="data-table">
+                        <thead>
+                            <tr>
+                                <th>S.NU</th>
+                                <th>Ad Soyad</th>
+                                <th>Meslek</th>
+                                <th>Başvuru No</th>
+                                <th>Durum</th>
+                                <th>Açıklama / Tarih</th>
+                                <th>Sorumlu</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Tab: Reports -->
+            <div id="tab-reports" class="tab-content">
+                <div class="coming-soon">
+                    <h3>Rapor Merkezi</h3>
+                    <p>Detaylı raporları yakında buradan alabileceksiniz.</p>
+                    <button class="btn btn-outline" onclick="alert('Henüz aktif değil')">Genel Rapor İndir
+                        (.xlsx)</button>
+                </div>
+            </div>
+
+            <!-- Tab: Quality -->
+            <div id="tab-quality" class="tab-content">
+                <div class="toolbar">
+                    <h3>Veri İnceleme Sonuçları</h3>
+                </div>
+                <div class="quality-checks" id="quality-list">
+                    <!-- Injected checks -->
+                </div>
+            </div>
+
+        </main>
+
+        <!-- Loading Overlay -->
+        <div id="loading" class="loading-overlay">
+            <div class="spinner"></div>
+            <p id="loading-text">Sistem Başlatılıyor...</p>
+        </div>
+    </div>
+
+    <!-- Toast Container (Injected by JS) -->
+
+    <!-- Scripts -->
+    <script type="module" src="js/app.js"></script>
+</body>
+
+</html>
