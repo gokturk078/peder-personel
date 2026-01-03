@@ -1,45 +1,37 @@
 # Personel Envanter & İzin Süreci Portalı
 
-Bu proje, Vanilla JS (ES Modules) kullanılarak geliştirilmiş, kurumsal kullanıma uygun modern bir web uygulamasıdır. Excel dosyalarından veriyi **otomatik okur**, dashboard üzerinde görselleştirir ve yönetim imkanı sağlar.
+Kurumsal seviyede personel yönetim portalı. Excel dosyalarından veri okur, dashboard üzerinde görselleştirir.
 
-## 🚀 Özellikler
+## 🚀 Çalıştırma
 
--   **Otomatik Veri Entegrasyonu**: `/data` klasöründeki Excel dosyalarını açılışta otomatik okur. Dosya yüklemeye gerek yoktur.
--   **Dashboard & KPI**: Anlık personel sayısı, süreç durumu ve dağılımlar.
--   **Detaylı Yönetim**: Tablo satırlarına tıklayarak detay penceresini (Drawer) açabilir, durum/not güncellemesi yapabilirsiniz.
--   **Kalıcı Düzenlemeler**: Yaptığınız değişiklikler tarayıcı hafızasında (LocalStorage) saklanır. Sayfayı yenileseniz bile kaybolmaz.
--   **Raporlama**: Detaylı filtreleme ve CSV dışa aktarım seçenekleri.
+```bash
+cd /Users/gokturkkahriman/peder-proje
+python3 -m http.server 8080
+```
 
-## 🛠 Kurulum ve Çalıştırma
+Tarayıcıda: **http://localhost:8080**
 
-Güvenlik (CORS) nedeniyle proje bir yerel sunucu üzerinde çalışmalıdır.
+## 📂 Veri Dosyaları
 
-1.  Terminali açın ve proje klasörüne gidin:
-    ```bash
-    cd /Users/gokturkkahriman/peder-proje
-    ```
+`data/` klasöründe 4 Excel dosyası bulunmalı:
 
-2.  Sunucuyu başlatın:
-    ```bash
-    python3 -m http.server 8080
-    ```
+| Dosya | Açıklama |
+|-------|----------|
+| `inventory.xlsx` | İzni çıkmış personel envanteri |
+| `process.xlsx` | Süreç takip çizelgesi |
+| `leaves_2025_12.xlsx` | Aralık 2025 izin belgeleri |
+| `departures_2025.xlsx` | 2025 işten ayrılanlar |
 
-3.  Tarayıcıda açın:
-    👉 [http://localhost:8080](http://localhost:8080)
+## 📋 Özellikler
 
-## 📂 Veri Güncelleme
+- **Dashboard**: KPI kartları, kategori/rol dağılımı grafikleri
+- **Personel Envanteri**: Arama, filtreleme, CSV export
+- **İzin Süreci**: Durum takibi, gecikme uyarıları
+- **Aylık İzin**: Dönem bazlı izin kullanımları
+- **Ayrılanlar**: Ay bazlı kategorize ayrılma verileri
+- **Veri Kalitesi**: Otomatik doğrulama kontrolleri
 
-Sistem verileri `data/` klasöründen okur:
--   **Envanter**: `data/inventory.xlsx`
--   **Süreç**: `data/process.xlsx`
+## 🔄 Veri Güncelleme
 
-**Veriyi güncellemek için:**
-1.  Yeni Excel dosyanızın ismini `inventory.xlsx` veya `process.xlsx` yapın.
-2.  `data/` klasöründeki eski dosyanın üzerine kaydedin.
-3.  Uygulamada sağ üstteki **"🔄 Yenile"** butonuna basın.
-
-## 📝 Kullanım İpuçları
--   **Düzenleme**: Listede bir isme tıklayın > Sağdan açılan panelde değişiklikleri yapın > Kaydet diyin.
--   **Sıfırlama**: Tüm el ile yapılan değişiklikleri silmek için üst menüdeki "🗑️ Sıfırla" butonunu kullanın.
--   **Veri Kalitesi**: Mükerrer kayıt veya eksik bilgi uyarılarını "Veri Kalitesi" sekmesinden takip edin.
-# peder-personel
+1. Yeni Excel'i `data/` klasörüne koyun
+2. Sayfada "🔄 Yenile" butonuna tıklayın

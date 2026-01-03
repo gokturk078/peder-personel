@@ -3,16 +3,25 @@
  */
 import { formatDate } from '../utils.js';
 
-export function renderKPIs(container, metrics) {
+export function renderKPIs(container, metrics, leaves = [], departureStats = null) {
     if (!container) return;
 
-    // metrics: { totalInventory, totalProcess, maxCategory, processStatusBreakdown }
+    // Build cards array
     const cards = [
-        { title: "Toplam Personel (İzni Çıkmış)", value: metrics.totalInventory, sub: "Hedef: 177 / Tamamlandı" },
+        { title: "Toplam Personel (İzni Çıkmış)", value: metrics.totalInventory, sub: "Envanter Kayıtlı" },
         { title: "Süreçteki Personel", value: metrics.totalProcess, sub: "Aktif Başvuru/İşlem" },
         { title: "En Büyük Grup", value: metrics.maxCategory?.name || "-", sub: `${metrics.maxCategory?.count || 0} Kişi` },
-        { title: "Ön İzin Onay", value: metrics.processStatusBreakdown?.["ÖN İZİN ONAYLANDI"] || 0, sub: "Süreç İçinde" }
+        { title: "Aylık İzin Kullanımı", value: leaves.length, sub: "Aralık 2025" },
     ];
+
+    // Add departures card if data exists
+    if (departureStats) {
+        cards.push({
+            title: "2025 Toplam Ayrılan",
+            value: departureStats.total,
+            sub: `En yoğun: ${departureStats.peakMonth} (${departureStats.peakCount})`
+        });
+    }
 
     container.innerHTML = cards.map(c => `
         <div class="kpi-card">

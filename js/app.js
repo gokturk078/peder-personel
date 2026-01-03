@@ -1,17 +1,24 @@
 import { fetchWorkbook, parseInventoryData, parseProcessData } from './dataLoader.js';
 import { calculateMetrics, performQualityChecks, augmentData } from './transforms.js';
 import { renderKPIs, renderTable, renderPagination, renderQualityChecks } from './ui/components.js';
-import { initCharts, renderCategoryChart, renderRepsamChart, renderStatusChart } from './ui/charts.js';
+import { initCharts, renderCategoryChart, renderRepsamChart, renderStatusChart, renderDeparturesChart } from './ui/charts.js';
 import { formatDate, debounce, exportToCSV } from './utils.js';
 import { clearOverrides } from './storage.js';
 import { openDrawer } from './ui/drawer.js';
 import { showToast } from './ui/toast.js';
+import { loadLeaveData } from './leaveLoader.js';
+import { loadDeparturesData, calculateDepartureStats } from './departuresLoader.js';
 
 // State
 const state = {
     // Raw Base Data
     baseInventory: [],
     baseProcess: [],
+
+    // New Modules
+    leaves: [],
+    departures: [],
+    departureStats: null,
 
     // Merged Active Data
     inventory: [],
@@ -31,6 +38,12 @@ const state = {
         procStatus: '',
         procRef: '',
         procLate: false,
+        // New filters
+        leavesSearch: '',
+        leavesType: '',
+        leavesPeriod: 'ARALIK 2025',
+        depSearch: '',
+        depMonth: '',
     }
 };
 
@@ -56,24 +69,39 @@ async function loadData() {
     state.qualityNotes = [];
 
     try {
-        // Parallel Fetch
-        const [invWb, procWb] = await Promise.all([
+        // Parallel Fetch - all 4 data sources
+        const [invWb, procWb, leavesResult, departuresResult] = await Promise.all([
             fetchWorkbook('./data/inventory.xlsx'),
-            fetchWorkbook('./data/process.xlsx')
+            fetchWorkbook('./data/process.xlsx'),
+            loadLeaveData(),
+            loadDeparturesData()
         ]);
 
-        // Parse
+        // Parse inventory & process
         const invResult = parseInventoryData(invWb);
         const procResult = parseProcessData(procWb);
 
         state.baseInventory = invResult.data;
         state.baseProcess = procResult.data;
-        state.qualityNotes = [...invResult.qualityNotes, ...procResult.qualityNotes];
+
+        // New modules
+        state.leaves = leavesResult.data;
+        state.departures = departuresResult.data;
+        state.departureStats = calculateDepartureStats(state.departures);
+
+        // Collect quality notes
+        state.qualityNotes = [
+            ...invResult.qualityNotes,
+            ...procResult.qualityNotes,
+            ...leavesResult.qualityNotes,
+            ...departuresResult.qualityNotes
+        ];
+
         state.lastUpdated = new Date();
 
-        applyData(); // Merge and update UI
+        applyData();
 
-        showToast('Veriler başarıyla yüklendi', 'success');
+        showToast('Tüm veriler başarıyla yüklendi', 'success');
         updateHeaderInfo();
 
     } catch (err) {
@@ -103,13 +131,19 @@ function updateApp() {
     // Badges
     document.getElementById('count-inventory').textContent = state.inventory.length;
     document.getElementById('count-process').textContent = state.process.length;
+    document.getElementById('count-leaves').textContent = state.leaves.length;
+    document.getElementById('count-departures').textContent = state.departures.length;
 
-    // Charts & KPIs if visible
-    renderKPIs(document.getElementById('dashboard-kpis'), state.metrics);
-    // Charts need re-render logic if tab active, simply calling them is safe usually as they check ctx
+    // Charts & KPIs
+    renderKPIs(document.getElementById('dashboard-kpis'), state.metrics, state.leaves, state.departureStats);
     renderCategoryChart(state.metrics.categoryCounts);
     renderRepsamChart(state.metrics.repsamRoles);
     renderStatusChart(state.metrics.processStatusBreakdown);
+
+    // New chart
+    if (state.departureStats) {
+        renderDeparturesChart(state.departureStats.byMonth);
+    }
 
     populateFilters();
     refreshTables();
@@ -122,6 +156,8 @@ function updateApp() {
 function refreshTables() {
     renderInventoryTable();
     renderProcessTable();
+    renderLeavesTable();
+    renderDeparturesTable();
 }
 
 // Filter Logic
@@ -137,7 +173,6 @@ function getFilteredInventory() {
 function renderInventoryTable() {
     const data = getFilteredInventory();
 
-    // Columns
     const cols = [
         { key: (r, i, abs) => abs, header: '#' },
         { key: 'full_name', header: 'Ad Soyad' },
@@ -145,7 +180,6 @@ function renderInventoryTable() {
         { key: 'tag', header: 'Etiket / Rol' }
     ];
 
-    // Pass click handler for drawer
     const totalPages = renderTable(
         'table-inventory',
         data,
@@ -196,6 +230,52 @@ function renderProcessTable() {
         (row) => openDrawer('process', row, () => applyData()));
 }
 
+// === NEW: Leaves Tab ===
+function getFilteredLeaves() {
+    return state.leaves.filter(row => {
+        const matchSearch = row.full_name.toLowerCase().includes(state.filters.leavesSearch);
+        const matchType = !state.filters.leavesType || row.leave_type === state.filters.leavesType;
+        const matchPeriod = !state.filters.leavesPeriod || row.period === state.filters.leavesPeriod;
+        return matchSearch && matchType && matchPeriod;
+    });
+}
+
+function renderLeavesTable() {
+    const data = getFilteredLeaves();
+
+    renderTable('table-leaves', data, [
+        { key: (r, i, abs) => abs, header: '#' },
+        { key: 'full_name', header: 'Ad Soyad' },
+        { key: 'leave_type', header: 'İzin Türü' },
+        { key: 'start_date', header: 'Başlangıç', render: (val) => formatDate(val) || val },
+        { key: 'end_date', header: 'Bitiş', render: (val) => formatDate(val) || val },
+        { key: 'days', header: 'Gün' },
+        { key: 'notes', header: 'Not' }
+    ], 1, 1000, null);
+}
+
+// === NEW: Departures Tab ===
+function getFilteredDepartures() {
+    return state.departures.filter(row => {
+        const matchSearch = row.full_name.toLowerCase().includes(state.filters.depSearch);
+        const matchMonth = !state.filters.depMonth || row.exit_month === state.filters.depMonth;
+        return matchSearch && matchMonth;
+    });
+}
+
+function renderDeparturesTable() {
+    const data = getFilteredDepartures();
+
+    renderTable('table-departures', data, [
+        { key: (r, i, abs) => abs, header: '#' },
+        { key: 'full_name', header: 'Ad Soyad' },
+        { key: 'entry_date', header: 'İşe Giriş', render: (val) => formatDate(val) || val },
+        { key: 'exit_date', header: 'Çıkış Tarihi', render: (val) => formatDate(val) || val },
+        { key: 'exit_month', header: 'Çıkış Ayı', render: (val) => `<span class="tag-badge">${val}</span>` },
+        { key: 'reason', header: 'Sebep' }
+    ], 1, 1000, null);
+}
+
 
 function setupEventListeners() {
     // Tabs
@@ -218,7 +298,7 @@ function setupEventListeners() {
     document.getElementById('btn-reset-changes').addEventListener('click', () => {
         if (confirm('Tüm manuel değişiklikler silinecek. Emin misiniz?')) {
             clearOverrides();
-            applyData(); // Re-merge (now with empty overrides)
+            applyData();
             showToast('Tüm değişiklikler sıfırlandı.', 'info');
         }
     });
@@ -234,9 +314,20 @@ function setupEventListeners() {
     document.getElementById('proc-filter-ref').addEventListener('change', (e) => { state.filters.procRef = e.target.value; renderProcessTable(); });
     document.getElementById('proc-filter-late').addEventListener('change', (e) => { state.filters.procLate = e.target.checked; renderProcessTable(); });
 
+    // === NEW: Leaves Listeners ===
+    document.getElementById('leaves-search').addEventListener('input', debounce((e) => { state.filters.leavesSearch = e.target.value.toLowerCase(); renderLeavesTable(); }, 300));
+    document.getElementById('leaves-filter-type').addEventListener('change', (e) => { state.filters.leavesType = e.target.value; renderLeavesTable(); });
+    document.getElementById('leaves-filter-period').addEventListener('change', (e) => { state.filters.leavesPeriod = e.target.value; renderLeavesTable(); });
+
+    // === NEW: Departures Listeners ===
+    document.getElementById('dep-search').addEventListener('input', debounce((e) => { state.filters.depSearch = e.target.value.toLowerCase(); renderDeparturesTable(); }, 300));
+    document.getElementById('dep-filter-month').addEventListener('change', (e) => { state.filters.depMonth = e.target.value; renderDeparturesTable(); });
+
     // Exports
     document.getElementById('btn-export-inventory').addEventListener('click', () => exportToCSV(getFilteredInventory(), 'Personel_Envanteri.csv'));
     document.getElementById('btn-export-process').addEventListener('click', () => exportToCSV(getFilteredProcess(), 'Izin_Sureci.csv'));
+    document.getElementById('btn-export-leaves').addEventListener('click', () => exportToCSV(getFilteredLeaves(), 'Aylik_Izin.csv'));
+    document.getElementById('btn-export-departures').addEventListener('click', () => exportToCSV(getFilteredDepartures(), 'Isten_Ayrilanlar.csv'));
 }
 
 function populateFilters() {
@@ -249,10 +340,15 @@ function populateFilters() {
     const refs = [...new Set(state.process.map(p => p.reference).filter(Boolean))].sort();
     updateSelect('proc-filter-status', statuses, state.filters.procStatus);
     updateSelect('proc-filter-ref', refs, state.filters.procRef);
+
+    // New: Leaves type filter
+    const leaveTypes = [...new Set(state.leaves.map(l => l.leave_type).filter(Boolean))].sort();
+    updateSelect('leaves-filter-type', leaveTypes, state.filters.leavesType);
 }
 
 function updateSelect(id, options, currentVal) {
     const sel = document.getElementById(id);
+    if (!sel) return;
     const first = sel.options[0];
     sel.innerHTML = '';
     sel.appendChild(first);
@@ -284,7 +380,7 @@ function showErrorState(msg) {
         <div style="text-align:center; padding:50px; color:var(--danger)">
             <h2>⚠️ Bir Sorun Oluştu</h2>
             <p>${msg}</p>
-            <p>Lütfen 'data' klasöründe 'inventory.xlsx' ve 'process.xlsx' dosyalarının olduğundan emin olun.</p>
+            <p>Lütfen 'data' klasöründe tüm Excel dosyalarının olduğundan emin olun.</p>
             <button class="btn btn-outline" onclick="location.reload()">Sayfayı Yenile</button>
         </div>
     `;

@@ -109,3 +109,35 @@ export function renderStatusChart(data) {
         }
     });
 }
+
+export function renderDeparturesChart(byMonth) {
+    // byMonth: { "OCAK": 2, "ŞUBAT": 1, ... }
+    const ctx = document.getElementById('chart-departures');
+    if (!ctx) return;
+
+    destroyChart('chart-departures');
+
+    const months = ['OCAK', 'ŞUBAT', 'MART', 'NİSAN', 'MAYIS', 'HAZİRAN',
+        'TEMMUZ', 'AĞUSTOS', 'EYLÜL', 'EKİM', 'KASIM', 'ARALIK'];
+    const values = months.map(m => byMonth[m] || 0);
+
+    charts['chart-departures'] = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: months,
+            datasets: [{
+                label: 'Ayrılan Sayısı',
+                data: values,
+                backgroundColor: '#ef4444',
+                borderRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
+    });
+}

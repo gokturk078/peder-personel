@@ -21,46 +21,116 @@ export async function fetchWorkbook(url) {
 
 /**
  * Parses the Inventory File (ÖN İZİNLE ADYA GELİP...)
- * Target Sheets: REPSAM, KALMES, BANGLADEŞ, NEŞAT, CAPRA, ÖZBEK, TÜRKMEN, ZİMBAVE
+ * Priority: "TÜM LİSTE" sheet (master list), fallback to category sheets
  */
 export function parseInventoryData(workbook) {
-    const categories = ['REPSAM', 'KALMES', 'BANGLADEŞ', 'NEŞAT', 'CAPRA', 'ÖZBEK', 'TÜRKMEN', 'ZİMBAVE'];
     let allPersonnel = [];
     let qualityNotes = [];
 
-    categories.forEach(cat => {
-        // Try to find the sheet case-insensitively or exact match
-        const sheetName = workbook.SheetNames.find(s => s.trim().toUpperCase() === cat);
+    // Category names to filter out from person names
+    const CATEGORY_NAMES = ['REPSAM', 'KALMES', 'BANGLADEŞ', 'NEŞAT', 'CAPRA', 'ÖZBEK', 'TÜRKMEN', 'ZİMBAVE', 'SAYILAR', 'TÜM LİSTE'];
 
-        if (!sheetName) {
-            qualityNotes.push({ status: 'warn', label: `Eksik Sayfa: ${cat}`, message: 'Bu kategoriye ait sayfa bulunamadı.' });
-            return;
-        }
+    // Check if TÜM LİSTE exists (master list with all personnel)
+    const masterSheetName = workbook.SheetNames.find(s =>
+        s.trim().toUpperCase().includes('TÜM') || s.trim().toUpperCase().includes('LİSTE')
+    );
 
-        const sheet = workbook.Sheets[sheetName];
-        // Convert to JSON with array of arrays to have control over columns
+    if (masterSheetName) {
+        // Use master list
+        const sheet = workbook.Sheets[masterSheetName];
         const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
-        // Assumption from prompt: A=Index, B=Name, C=Tag
-        // Usually rows[0] might be header or empty. We scan rows.
-        rows.forEach((row, rowIndex) => {
-            // Check if Row B (index 1) has a name
-            const name = row[1]; // B column
-            if (name && typeof name === 'string' && name.trim().length > 2) {
-                // Filter out header lines if they exist like "ADI SOYADI"
-                if (name.includes('ADI SOYADI') || name.includes('İSİM')) return;
+        // Find header row
+        let headerIdx = 0;
+        for (let i = 0; i < Math.min(10, rows.length); i++) {
+            const row = rows[i];
+            if (row && row.some(cell => cell && cell.toString().toUpperCase().includes('ADI'))) {
+                headerIdx = i;
+                break;
+            }
+        }
 
-                const tag = row[2] || cat; // C column or fallback to Category name
+        // Parse rows after header
+        for (let i = headerIdx + 1; i < rows.length; i++) {
+            const row = rows[i];
+            if (!row) continue;
 
+            // Try to find name column (usually B or first text column after index)
+            let name = null;
+            let category = '';
+            let tag = '';
+
+            // Scan columns for name-like value
+            for (let c = 0; c < row.length; c++) {
+                const cell = row[c];
+                if (cell && typeof cell === 'string' && cell.trim().length > 2) {
+                    const cellUpper = cell.trim().toUpperCase();
+
+                    // Skip header-like cells and category names
+                    // Use exact header matches to avoid filtering names like "CUMHUR BAHADIR"
+                    if (cellUpper === 'ADI SOYADI' || cellUpper === 'ADI' || cellUpper.includes('S.NO') || cellUpper === 'S.NU') continue;
+                    if (CATEGORY_NAMES.includes(cellUpper)) continue;
+
+                    if (!name) {
+                        name = cellUpper;
+                    } else if (!category) {
+                        category = cellUpper;
+                    } else if (!tag) {
+                        tag = cellUpper;
+                        break;
+                    }
+                }
+            }
+
+            if (name) {
                 allPersonnel.push({
-                    category: cat,
-                    full_name: name.trim().toUpperCase(),
-                    tag: tag ? tag.toString().trim().toUpperCase() : ''
+                    category: category || 'GENEL',
+                    full_name: name,
+                    tag: tag || category || ''
                 });
             }
-        });
-    });
+        }
 
+        qualityNotes.push({
+            status: 'ok',
+            label: 'Envanter Kaynağı',
+            message: `"${masterSheetName}" sayfasından ${allPersonnel.length} kayıt yüklendi.`
+        });
+
+    } else {
+        // Fallback: Read individual category sheets
+        const categories = ['REPSAM', 'KALMES', 'BANGLADEŞ', 'NEŞAT', 'CAPRA', 'ÖZBEK', 'TÜRKMEN', 'ZİMBAVE'];
+
+        categories.forEach(cat => {
+            const sheetName = workbook.SheetNames.find(s => s.trim().toUpperCase() === cat);
+
+            if (!sheetName) {
+                qualityNotes.push({ status: 'warn', label: `Eksik Sayfa: ${cat}`, message: 'Bu kategoriye ait sayfa bulunamadı.' });
+                return;
+            }
+
+            const sheet = workbook.Sheets[sheetName];
+            const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+            rows.forEach((row) => {
+                const name = row[1]; // B column
+                if (name && typeof name === 'string' && name.trim().length > 2) {
+                    if (name.includes('ADI SOYADI') || name.includes('İSİM')) return;
+
+                    const tag = row[2] || cat;
+
+                    allPersonnel.push({
+                        category: cat,
+                        full_name: name.trim().toUpperCase(),
+                        tag: tag ? tag.toString().trim().toUpperCase() : ''
+                    });
+                }
+            });
+        });
+    }
+
+    // Return all personnel from Excel - Excel is the source of truth
+    // Same-named people may exist and should all be counted
     return { data: allPersonnel, qualityNotes };
 }
 

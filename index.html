@@ -62,7 +62,9 @@
                 <ul>
                     <li class="active" data-tab="dashboard">Dashboard</li>
                     <li data-tab="inventory">Personel Envanteri <span class="badge" id="count-inventory">0</span></li>
-                    <li data-tab="process">İzin Süreci <span class="badge" id="count-process">0</span></li>
+                    <li data-tab="process">Ön İzin Süreci <span class="badge" id="count-process">0</span></li>
+                    <li data-tab="leaves">İzin Kullanımı <span class="badge" id="count-leaves">0</span></li>
+                    <li data-tab="departures">İşten Ayrılanlar <span class="badge" id="count-departures">0</span></li>
                     <li data-tab="reports">Raporlar</li>
                     <li data-tab="quality">Veri Kalitesi</li>
                 </ul>
@@ -85,6 +87,10 @@
                     <div class="chart-card">
                         <h3>Süreç Durumu</h3>
                         <canvas id="chart-status"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Aylık Ayrılma Sayıları (2025)</h3>
+                        <canvas id="chart-departures"></canvas>
                     </div>
                 </div>
             </div>
@@ -153,6 +159,85 @@
                                 <th>Durum</th>
                                 <th>Açıklama / Tarih</th>
                                 <th>Sorumlu</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Tab: Leaves (Aylık İzin) -->
+            <div id="tab-leaves" class="tab-content">
+                <div class="toolbar">
+                    <div class="filters">
+                        <input type="text" id="leaves-search" placeholder="Personel Ara..." class="search-input">
+                        <select id="leaves-filter-type" class="filter-select">
+                            <option value="">Tüm İzin Türleri</option>
+                        </select>
+                        <select id="leaves-filter-period" class="filter-select">
+                            <option value="ARALIK 2025">Aralık 2025</option>
+                        </select>
+                    </div>
+                    <div class="actions">
+                        <button class="btn btn-primary" id="btn-export-leaves">CSV İndir</button>
+                    </div>
+                </div>
+                <p class="section-hint">📅 Aylık izin kullanım verileri. Gelecekte yeni dönemler eklenecektir.</p>
+                <div class="table-container">
+                    <table id="table-leaves" class="data-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Ad Soyad</th>
+                                <th>İzin Türü</th>
+                                <th>Başlangıç</th>
+                                <th>Bitiş</th>
+                                <th>Gün</th>
+                                <th>Not</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Tab: Departures (Ayrılanlar) -->
+            <div id="tab-departures" class="tab-content">
+                <div class="toolbar">
+                    <div class="filters">
+                        <input type="text" id="dep-search" placeholder="Personel Ara..." class="search-input">
+                        <select id="dep-filter-month" class="filter-select">
+                            <option value="">Tüm Aylar</option>
+                            <option value="OCAK">Ocak</option>
+                            <option value="ŞUBAT">Şubat</option>
+                            <option value="MART">Mart</option>
+                            <option value="NİSAN">Nisan</option>
+                            <option value="MAYIS">Mayıs</option>
+                            <option value="HAZİRAN">Haziran</option>
+                            <option value="TEMMUZ">Temmuz</option>
+                            <option value="AĞUSTOS">Ağustos</option>
+                            <option value="EYLÜL">Eylül</option>
+                            <option value="EKİM">Ekim</option>
+                            <option value="KASIM">Kasım</option>
+                            <option value="ARALIK">Aralık</option>
+                        </select>
+                    </div>
+                    <div class="actions">
+                        <button class="btn btn-primary" id="btn-export-departures">CSV İndir</button>
+                    </div>
+                </div>
+                <p class="section-hint">🚪 2025 yılında işten ayrılan personel listesi. Çıkış tarihine göre aylık
+                    kategorize edilmiştir.</p>
+                <div class="table-container">
+                    <table id="table-departures" class="data-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Ad Soyad</th>
+                                <th>İşe Giriş</th>
+                                <th>Çıkış Tarihi</th>
+                                <th>Çıkış Ayı</th>
+                                <th>Sebep</th>
                             </tr>
                         </thead>
                         <tbody></tbody>
